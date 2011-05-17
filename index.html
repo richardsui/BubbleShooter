@@ -1,0 +1,374 @@
+<html>
+<head>
+<style>
+.centered {
+	display:block;
+	margin:0 auto;
+	text-align: center;
+}
+</style>
+</head>
+<body>
+<canvas id="canvas" class="centered" width="500" height="500">
+</canvas>
+<script>
+// definitions
+var canvas = document.getElementById("canvas");
+var ctx = canvas.getContext("2d");
+// keyboard directions
+var keyLeft = false;
+var keyUp = false;
+var keyRight = false;
+var keyDown = false;
+// mouse state
+var mouseDown = false;
+var mouseX;
+var mouseY;
+
+// current player position
+var userX = 250;
+var userY = 250;
+// player stats
+var userHealth = 100;
+var maxHealth = 100;
+var userSpeed = 3;
+var userScore = 0;
+
+var enemies = [];
+var lastEnemyTime = getTime()+2000; // 3 seconds until enemies start spawning
+
+var bullets = [];
+var bulletDelay = 500;
+var bulletSize = 5;
+var lastShotTime = getTime();
+
+// upgrades
+var lastUpgradeTime = getTime();
+var upgrades = [];
+
+// fps calculations
+var frames = 0;
+var lastReset = getTime();
+var fps = 60.0;
+
+document.onkeydown = function(evt) {
+		switch(evt.keyCode){
+		case 37:
+		case 65:
+			keyLeft = true;
+			break;
+		case 38:
+		case 87:
+			keyUp = true;
+			break;
+		case 39:
+		case 68:
+			keyRight = true;
+			break;
+		case 40:
+		case 83:
+			keyDown = true;
+			break;
+		default:
+			break;
+	}
+}
+document.onkeyup = function(evt) {
+	switch(evt.keyCode){
+		case 37:
+		case 65:
+			keyLeft = false;
+			break;
+		case 38:
+		case 87:
+			keyUp = false;
+			break;
+		case 39:
+		case 68:
+			keyRight = false;
+			break;
+		case 40:
+		case 83:
+			keyDown = false;
+			break;
+		default:
+			break;
+	}
+}
+
+function onMouseMove(evt) {
+	mouseX = evt.pageX;
+	mouseY = evt.pageY;
+}
+
+function onMouseUp(evt) {
+	mouseDown = false;
+}
+function onMouseDown(evt) {
+	mouseDown = true;
+	
+}
+function getTime() {
+	return (new Date()).getTime();
+}
+
+function init() {
+	// attach mouse listeners
+	canvas.addEventListener('mousemove', onMouseMove, false);
+	canvas.addEventListener('mousedown', onMouseDown, false);
+	canvas.addEventListener('mouseup',   onMouseUp, false);
+	intervalId = setInterval(gameLoop, 10); // calls the loop function every 10 ms
+	return intervalId;
+}
+
+function addEnemy(x, y, radius, speedX, speedY) {
+	enemy = new Object();
+	enemy.positionX = x;
+	enemy.positionY = y;
+	enemy.radius = radius;
+	enemy.health = radius;
+	enemy.speedX = speedX;
+	enemy.speedY = speedY;
+	enemies.push(enemy);
+}
+function addUpgrade(x, y) {
+	upgrade = new Object();
+	upgrade.positionX = x;
+	upgrade.positionY = y;
+	upgrade.radius = 10;
+	upgrades.push(upgrade);
+}
+function moveX(x) {
+	userX += x;
+	//overflow and underflow check, so player doesn't leave arena
+	if (userX > canvas.width-30) {
+		userX = canvas.width-30;
+	} else if (userX < 10) {
+		userX = 10;
+	}	
+}
+
+function moveY(y) {
+	userY += y;
+	if (userY > canvas.height-30) {
+		userY = canvas.height-30;
+	} else if (userY < 10) {
+		userY = 10;
+	}
+}
+
+function gameLoop() {
+	draw();
+	// movement check
+	if (keyRight) moveX(userSpeed);
+	else if (keyLeft) moveX(-userSpeed);
+	else if (keyUp) moveY(-userSpeed);
+	else if (keyDown) moveY(userSpeed);
+	// add bullets
+	if (mouseDown && ((getTime()-lastShotTime) > bulletDelay)) {
+		
+		bullet = new Object();
+		bullet.speed = 5;
+		bullet.size = bulletSize;
+		bullet.positionX = userX+2;
+		bullet.positionY = userY+2;
+		
+		with(Math) {
+			x = userX - (mouseX - (document.width - canvas.width)/2)+7;
+			y = userY - mouseY+12;
+			angle = atan(y/x);
+			bullet.speedY = sin(angle)*bullet.speed;
+			bullet.speedX = cos(angle)*bullet.speed;
+		}
+		if (x >= 0) {
+			// left quadrants
+			bullet.speedX = -bullet.speedX;
+			bullet.speedY = -bullet.speedY;
+		}
+		bullets.push(bullet);
+		lastShotTime = getTime();
+	}
+	// add 10 enemies per second
+	if (getTime() - lastEnemyTime > 100) {
+		with(Math){
+			addEnemy(random()*500, random()*500, random()*10+5, random()>0.5?-random():random(), random()>0.5?-random():random());
+			lastEnemyTime = getTime();
+		}
+	}
+	// add upgrades ever 5 seconds
+	if (getTime() - lastUpgradeTime > 5000) {
+		// drop an upgrade between (50,50) and (450, 450)
+		addUpgrade(Math.random()*400+50, Math.random()*400+50);
+		lastUpgradeTime = getTime();
+	}
+	// death check
+	if (userHealth <= 0) {
+		alert("Game Over. Your score is "+Math.round(userScore)+". Refresh to play again");
+		clearInterval(intervalId);
+	}
+}
+
+function draw() {
+	// clear screen so doesn't leave afterimages
+	//ctx.clearRect(0, 0, canvas.width, canvas.height);
+	++frames; // for counting the fps
+	// draw background
+	ctx.beginPath();
+	ctx.rect(0,0,canvas.width,canvas.height);
+	ctx.closePath();
+	ctx.fillStyle="#DDDDDD";
+	ctx.fill();
+	
+	// draw user
+	ctx.beginPath();
+	ctx.arc(userX, userY, 10, 0, Math.PI*2, true);
+	ctx.closePath();
+	//ctx.fillStyle="#222222";
+	radgrad = ctx.createRadialGradient(userX-13,userY-13,20,userX+1,userY+4,30);
+    radgrad.addColorStop(0, '#151515');
+    radgrad.addColorStop(1, '#FFFFFF');
+	ctx.fillStyle = radgrad;
+	ctx.fill();
+	// draw hp
+	ctx.beginPath();
+	ctx.rect(userX-16, userY-20, 100/3, 5);
+	ctx.closePath();
+	ctx.fillStyle = "#FF0000";
+	ctx.fill();
+	ctx.beginPath();
+	ctx.rect(userX-16, userY-20, userHealth/maxHealth*33, 5);
+	ctx.closePath();
+	ctx.fillStyle = "#00FF00";
+	ctx.fill();
+	// draw bullets
+	for(var i in bullets) {
+		ctx.beginPath();
+		bullets[i].positionY += bullets[i].speedY;
+		bullets[i].positionX += bullets[i].speedX;
+		ctx.arc(bullets[i].positionX, bullets[i].positionY, bullets[i].size, 0, Math.PI*2, true);
+		ctx.closePath();
+		ctx.fillStyle="#000000";
+		//radgrad = ctx.createRadialGradient(bullets[i].positionX,bullets[i].positionY,bullets[i].size/5*4,bullets[i].positionX,bullets[i].positionY,bullets[i].size);
+		//radgrad.addColorStop(0, '#333333');
+		//radgrad.addColorStop(1, '#000000');
+		//ctx.fillStyle = radgrad;
+		ctx.fill();
+		
+		// remove bullets when they leave the screen
+		if ((bullets[i].positionX > canvas.width) || (bullets[i].positionY > canvas.height) ||
+			(bullets[i].positionX <= 0) ||(bullets[i].positionY <= 0)) bullets.splice(i,1);
+	}
+
+	// user collision detection
+	for(var i in enemies) {
+		with(Math) {
+			distance = sqrt(pow(enemies[i].positionY-userY,2)+pow(enemies[i].positionX-userX,2));
+		}
+		if ((enemies[i].radius + 10) >= distance) {
+			userHealth -= Math.round(enemies[i].radius);
+			userScore -= Math.pow(enemies[i].radius,2);
+			enemies.splice(i,1);
+		}
+		// draw enemies
+		ctx.beginPath();
+		enemies[i].positionX += enemies[i].speedX;
+		enemies[i].positionY += enemies[i].speedY;
+		ctx.arc(enemies[i].positionX, enemies[i].positionY, enemies[i].radius, Math.PI*2, false);
+		ctx.closePath();
+		ctx.fillStyle="#0000FF";
+		ctx.fill();
+		// remove enemies when they leave the screen
+		if ((enemies[i].positionX > canvas.width) || (enemies[i].positionY > canvas.height) ||
+			(enemies[i].positionX <= 0) ||(enemies[i].positionY <= 0)) enemies.splice(i,1);
+	}
+	// draw upgrades
+	for (var i in upgrades) {
+		ctx.beginPath();
+		ctx.closePath();
+		ctx.arc(upgrades[i].positionX, upgrades[i].positionY, upgrades[i].radius, Math.PI*2, false);
+		ctx.fillStyle="#FF00FF";
+		ctx.fill();
+		
+		// if within range of upgrade
+		with(Math) {
+			distance = sqrt(pow(upgrades[i].positionY-userY,2)+pow(upgrades[i].positionX-userX,2));
+		}
+		if ((upgrades[i].radius + 10) >= distance) {
+			upgrades.splice(i,1);
+			upgradeType = Math.floor(Math.random()*4);
+			switch(upgradeType) {
+				case 0:
+					if (bulletDelay > 50) bulletDelay -= 25;
+					break;
+				case 1:
+					if (bulletSize < 50) bulletSize += 5;
+					else if (bulletDelay > 50) bulletDelay -= 25;
+					break;
+				case 2:
+					// give random hp between 10 and 50
+					if (userHealth < maxHealth) userHealth += Math.random()*40+10+maxHealth/10;
+					if (userHealth > maxHealth) userHealth = maxHealth;
+				case 3:
+					maxHealth += 20;
+					userHealth += 20;
+				default:
+					break;
+			
+			}
+		}
+	}
+	
+	// bullet collision detection
+	for(var j in enemies) {
+		for (var i in bullets) {
+			with(Math) {
+				distance = sqrt(pow(enemies[j].positionY-bullets[i].positionY,2)+pow(enemies[j].positionX-bullets[i].positionX,2));
+			}
+			if ((bullets[i].size + enemies[j].radius) > distance) {
+				enemies[j].radius -= bullets[i].size;
+				if (enemies[j].radius <= 0){
+					userScore += 100;
+					enemies.splice(j,1);
+				}
+				if(bullets[i].size > enemies[j].radius) {
+					userScore += enemies[j].radius;
+					bullets[i].size -= enemies[j].radius;
+				} else {
+					userScore += bullets[i].size;
+					bullets.splice(i,1);
+				}
+			}
+		}
+	}
+	
+	// draw stats
+	ctx.fillStyle="#000000";
+	ctx.fillText("Score: "+Math.round(userScore), 10, 10);
+	ctx.fillText("Health: "+Math.round(userHealth)+"/"+maxHealth, 10, 20);
+	ctx.fillText("Bullet Delay: "+bulletDelay+(bulletDelay<=50?"(max)":""), 10, 30);
+	ctx.fillText("Bullet Size: "+bulletSize+(bulletSize>=50?"(max)":""), 10, 40);
+	ctx.fillText("Enemies on screen: "+enemies.length, 10, 50);
+	ctx.fillText("Bullets on screen: "+bullets.length, 10, 60);
+	// show fps
+	if(frames > 100) {
+		fps = frames/((getTime()-lastReset)/1000);
+		lastReset = getTime();
+		frames = 0;
+	}
+	ctx.fillText("FPS: "+Math.round(fps), 10, 70);
+	
+}
+// begin game
+init();
+</script>
+<div class="centered">
+Arrow keys or wasd to move, mouse to aim and shoot. Hold down left key to shoot continously
+<br>
+Blue dots are enemies, touching them will decrease your health and your score
+<br>
+Pink dots are upgrades. Touch them give you a random boost to one stat.
+<br>
+Enemies will become smaller as you shoot them, until they disappear completely.
+</div>
+</body>
+</html>
